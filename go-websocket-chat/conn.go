@@ -1,8 +1,10 @@
 package main
 
 import (
-	"github.com/gorilla/websocket"
+	"fmt"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 )
 
 type connection struct {
@@ -14,9 +16,15 @@ type connection struct {
 }
 
 func (c *connection) reader() {
+	defer func() {
+		h.unregister <- c
+		c.ws.Close()
+	}()
+
 	for {
 		_, message, err := c.ws.ReadMessage()
 		if err != nil {
+			fmt.Println(err)
 			break
 		}
 		h.broadcast <- message
@@ -43,7 +51,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	c := &connection{send: make(chan []byte, 256), ws: ws}
 	h.register <- c
-	defer func() { h.unregister <- c }()
+
 	go c.writer()
-	c.reader()
+	go c.reader()
 }
